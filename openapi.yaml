@@ -1,0 +1,279 @@
+openapi: 3.0.0
+info:
+  title: Labyrinth Game API
+  description: API zur Steuerung eines Labyrinth-Spiels mit OpenAPI-Spezifikation
+  version: 1.0.0
+
+servers:
+  - url: https://labyrinth-game.example.com/api
+    description: Produktivserver
+
+tags:
+  - name: Game
+    description: Alle Endpunkte für das Spiel
+  - name: Move
+    description: Alle Endpunkte für Spielerbewegungen
+
+paths:
+  /move/{moveId}:
+    get:
+      tags:
+        - Move
+      summary: Bewegung mit einer ID abrufen
+      description: Gibt die Details einer bestimmten Bewegung anhand der Bewegungs-ID zurück.
+      parameters:
+        - name: moveId
+          in: path
+          required: true
+          description: Die eindeutige ID der Bewegung
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bewegung erfolgreich abgerufen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+        '404':
+          description: Bewegung nicht gefunden
+
+  /game/{position}: 
+    put: 
+      tags:
+        - Game 
+      summary: Position des Spiels bestimmen 
+      description: Setzt die Position des Spiels und aktualisiert sie.
+      parameters:
+        - name: position
+          in: path
+          required: true
+          description: Die neue Position des Spielers (z. B. "A1", "B2")
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gameId:
+                  type: string
+                  description: Die eindeutige ID des Spiels
+      responses:
+        '200':
+          description: Position erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [successful, failed]
+                    description: Gibt zurück, ob die Aktualisierung erfolgreich war oder fehlgeschlagen ist.
+        '404':
+          description: Spiel oder Bewegung nicht gefunden
+
+  /move/status:
+    get:
+      tags:
+        - Move
+      summary: Status der letzten Bewegung abfragen
+      description: Gibt zurück, ob die Bewegung erfolgreich war, ob eine Wand im Weg war, oder ob die Bewegung fehlgeschlagen ist (z. B. weil das Spielfeld verlassen wurde).
+      responses:
+        '200':
+          description: Status der Bewegung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveStatus'
+        '404':
+          description: Keine Bewegung gefunden
+
+  /move/direction/{direction}:
+    post:
+      tags:
+        - Move
+      summary: Spieler in eine Richtung bewegen
+      description: Bewegt den Spieler in die angegebene Richtung und gibt den neuen Status und die Position zurück.
+      parameters:
+        - name: direction
+          in: path
+          required: true
+          description: Richtung, in die der Spieler gehen möchte
+          schema:
+            type: string
+            enum: [up, down, left, right]
+      responses:
+        '200':
+          description: Bewegung erfolgreich
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+        '400':
+          description: Ungültige Bewegung (z. B. Spielfeld verlassen oder gegen eine Wand)
+        '404':
+          description: Bewegung nicht gefunden
+
+  /move/position:
+    get:
+      tags:
+        - Move
+      summary: Position auf dem Spielfeld abfragen
+      description: Gibt die aktuelle Position des Spielers auf dem Spielfeld zurück (z. B. "A1").
+      responses:
+        '200':
+          description: Aktuelle Position des Spielers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovePosition'
+        '404':
+          description: Position nicht gefunden
+
+  /move/steps:
+    get:
+      tags:
+        - Move
+      summary: Alle gegangenen Schritte abrufen
+      description: Gibt eine Liste aller bisher durchgeführten Schritte des Spielers zurück.
+      responses:
+        '200':
+          description: Liste der gegangenen Schritte
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MoveStep'
+        '404':
+          description: Keine Schritte gefunden
+
+  /game/{gameId}:
+    post:
+      tags:
+        - Game
+      summary: Neues Spiel mit ID erstellen
+      description: Erstellt eine neue Spielsitzung und gibt die Spiel-ID sowie die Startposition zurück.
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Die eindeutige ID des Spiels
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Spiel erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameState'
+        '400':
+          description: Spiel konnte nicht erstellt werden
+
+  /game/finished:
+    get:
+      tags:
+        - Game
+      summary: Überprüfen, ob das Spiel beendet ist
+      description: Gibt zurück, ob das Spiel beendet ist, weil der Spieler das Spielfeld verlassen hat (Status "fail").
+      responses:
+        '200':
+          description: Spielstatus erfolgreich abgerufen (Beendet mit Status "failed")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameFinished'
+        '404':
+          description: Spiel nicht gefunden
+
+components:
+  schemas:
+    MoveRequest:
+      type: object
+      properties:
+        direction:
+          type: string
+          enum: [up, down, left, right]
+          description: Richtung, in die sich der Spieler bewegen möchte
+
+    MoveResponse:
+      type: object
+      properties:
+        moveId:
+          type: string
+          description: Eindeutige ID der Bewegung
+        position:
+          type: string
+          description: Neue Position des Spielers nach dem Zug (z. B. "B2")
+        status:
+          type: string
+          enum: [ongoing, success, failed, out_of_bounds]
+          description: Aktueller Status des Spiels nach der Bewegung
+
+    MoveStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Gibt an, ob die Bewegung erfolgreich war
+        message:
+          type: string
+          description: Meldung, ob die Bewegung erfolgreich war oder ob der Spieler eine Wand getroffen oder das Spielfeld verlassen hat
+
+    MovePosition:
+      type: object
+      properties:
+        position:
+          type: string
+          description: Aktuelle Position des Spielers auf dem Spielfeld (z. B. "A1")
+
+    MoveStep:
+      type: object
+      properties:
+        moveId:
+          type: string
+          description: Eindeutige ID der Bewegung
+        position:
+          type: string
+          description: Position des Spielers nach der Bewegung (z. B. "B2")
+        timestamp:
+          type: string
+          format: date-time
+          description: Zeitstempel der Bewegung
+
+    GameState:
+      type: object
+      properties:
+        gameId:
+          type: string
+          description: Eindeutige ID des Spiels
+        position:
+          type: string
+          description: Startposition des Spielers (z. B. "A1")
+        size:
+          type: integer
+          description: Die Größe des Spielfelds (z. B. 5 für ein 5x5-Feld)
+          example: 5
+        finished:
+          type: boolean
+          description: Gibt an, ob das Spiel beendet ist
+        status:
+          type: string
+          enum: [ongoing, failed, success]
+          description: Aktueller Status des Spiels
+
+    GameFinished:
+      type: object
+      properties:
+        finished:
+          type: boolean
+          description: Gibt an, ob das Spiel beendet ist (true, wenn der Spieler verloren hat)
+        status:
+          type: string
+          enum: [fail, success]
+          description: Status des Spiels nach Beendigung (z. B. "fail" für Verlust oder "success" für Gewinn)
